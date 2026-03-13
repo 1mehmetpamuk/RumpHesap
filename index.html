@@ -1054,7 +1054,41 @@ function addKalem() {
 }
 function delKalem(i) { S.kalemler.splice(i,1); renderKalemler(); recalc(); }
 
-function satisBirim(k) { return (k.alis||0)*(1+(k.karPct||0)/100); }
+function satisBirim(k) {
+  if(k.satisManuel != null) return k.satisManuel;
+  return (k.alis||0)*(1+(k.karPct||0)/100);
+}
+
+function setSatisBirim(i, val) {
+  if(val === '') { S.kalemler[i].satisManuel = null; }
+  else {
+    S.kalemler[i].satisManuel = +val;
+    // Kar %'yi güncelle
+    const alis = S.kalemler[i].alis||0;
+    if(alis > 0) {
+      S.kalemler[i].karPct = ((+val - alis) / alis * 100);
+      const inp = document.getElementById('kar-inp-'+i);
+      if(inp) inp.value = S.kalemler[i].karPct.toFixed(2);
+    }
+  }
+  recalc();
+}
+
+function onKarChange(i, val) {
+  S.kalemler[i].karPct = +val;
+  S.kalemler[i].satisManuel = null;
+  recalc();
+  const inp = document.getElementById('satis-inp-'+i);
+  if(inp) inp.value = satisBirim(S.kalemler[i]).toFixed(2);
+}
+
+function onAlisChange(i, val) {
+  S.kalemler[i].alis = +val;
+  S.kalemler[i].satisManuel = null;
+  recalc();
+  const inp = document.getElementById('satis-inp-'+i);
+  if(inp) inp.value = satisBirim(S.kalemler[i]).toFixed(2);
+}
 
 // Her kalem için alış KDV tutarı
 function alisKdvTutar(k) { return (k.alis||0)*(k.adet||1)*((k.alisKdv??20)/100); }
@@ -1092,11 +1126,11 @@ function renderKalemler() {
           </div>
           <div class="item-row-mob-field">
             <div class="item-row-mob-lbl">Kar %</div>
-            <input type="number" placeholder="25" value="${k.karPct!=null?k.karPct:25}" oninput="S.kalemler[${i}].karPct=+this.value;recalc()" min="0" max="9999" inputmode="numeric">
+            <input id="kar-inp-${i}" type="number" placeholder="25" value="${k.karPct!=null?(+k.karPct).toFixed(2):25}" oninput="onKarChange(${i},this.value)" min="0" max="9999" inputmode="decimal">
           </div>
           <div class="item-row-mob-field">
-            <div class="item-row-mob-lbl">Satış Birim (KDV hariç)</div>
-            <div class="ir-val">${fmt(satisBirim(k))}</div>
+            <div class="item-row-mob-lbl">Satış Birim (₺) — düzenlenebilir</div>
+            <input id="satis-inp-${i}" type="number" placeholder="0.00" value="${satisBirim(k).toFixed(2)}" oninput="setSatisBirim(${i},this.value)" min="0" step="0.01" inputmode="decimal" style="color:var(--green);font-weight:600;">
           </div>
           <div class="item-row-mob-field">
             <div class="item-row-mob-lbl">Satış Toplam (KDV hariç)</div>
@@ -1111,16 +1145,14 @@ function renderKalemler() {
     document.getElementById('kalemler').innerHTML = S.kalemler.map((k,i)=>`
       <div class="item-row">
         <input placeholder="Ürün / hizmet açıklaması" value="${k.ac||''}" oninput="S.kalemler[${i}].ac=this.value">
-        <input type="number" placeholder="0.00" value="${k.alis||''}" oninput="S.kalemler[${i}].alis=+this.value;recalc()" min="0" step="0.01">
+        <input type="number" placeholder="0.00" value="${k.alis||''}" oninput="onAlisChange(${i},this.value)" min="0" step="0.01">
         <select onchange="S.kalemler[${i}].alisKdv=+this.value;recalc()" style="background:var(--bg2);border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.78rem;outline:none;width:100%;cursor:pointer;">${kdvOpts(k.alisKdv??20)}</select>
         <input type="number" placeholder="1" value="${k.adet||1}" oninput="S.kalemler[${i}].adet=+this.value;recalc()" min="1">
         <div class="ir-val">${fmt((k.alis||0)*(k.adet||1)*(1+(k.alisKdv??20)/100))}</div>
-        <input type="number" placeholder="25" value="${k.karPct!=null?k.karPct:25}" oninput="S.kalemler[${i}].karPct=+this.value;recalc()" min="0" max="9999" step="1">
-        <div class="ir-val">${fmt(satisBirim(k))}</div>
-        <div class="ir-val">${fmt(satisBirim(k)*(k.adet||1))}</div>
+        <input id="kar-inp-${i}" type="number" placeholder="25" value="${k.karPct!=null?(+k.karPct).toFixed(2):25}" oninput="onKarChange(${i},this.value)" min="0" max="9999" step="0.01">
+        <input id="satis-inp-${i}" type="number" placeholder="0.00" value="${satisBirim(k).toFixed(2)}" oninput="setSatisBirim(${i},this.value)" min="0" step="0.01" style="color:var(--green);font-weight:600;text-align:right;">
+        <div class="ir-val" style="color:var(--green);">${fmt(satisBirim(k)*(k.adet||1))}</div>
         <button class="ir-del" onclick="delKalem(${i})">✕</button>
-      </div>`).join('');
-  }
 }
 
 /*
