@@ -577,14 +577,20 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Gelir Adı</th><th>Tutar</th><th>Sıklık</th><th>Başlangıç</th><th>Bu Ay</th><th>İşlem</th></tr></thead>
+        <thead><tr><th>Gelir Adı</th><th>Açıklama</th><th>Miktar</th><th>KDV %</th><th>Sıklık</th><th>Bu Ay Net</th><th>Bu Ay KDV</th><th>İşlem</th></tr></thead>
         <tbody id="sabitGelirBody"></tbody>
       </table>
     </div>
     <div class="mob-gider-list" id="sabitGelirMobList"></div>
-    <div style="margin-top:1.5rem;padding:1rem;background:var(--surface);border-radius:12px;border:1px solid var(--border);">
-      <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Bu Ay Toplam Sabit Gelir</div>
-      <div id="sabitGelirToplam" style="font-size:1.8rem;font-weight:700;color:var(--green);">₺0,00</div>
+    <div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div style="padding:1rem;background:var(--surface);border-radius:12px;border:1px solid var(--border);">
+        <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Bu Ay Toplam Sabit Gelir (KDV Hariç)</div>
+        <div id="sabitGelirToplam" style="font-size:1.8rem;font-weight:700;color:var(--green);">₺0,00</div>
+      </div>
+      <div style="padding:1rem;background:var(--surface);border-radius:12px;border:1px solid var(--border);">
+        <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Bu Ay Tahsil Edilen KDV</div>
+        <div id="sabitGelirKdvToplam" style="font-size:1.8rem;font-weight:700;color:var(--amber);">₺0,00</div>
+      </div>
     </div>
   </div>
 
@@ -772,7 +778,16 @@
     <div class="mh"><div class="mt-modal">Sabit Gelir Ekle</div><button class="mc" onclick="closeMo('sabitGelirModal')">✕</button></div>
     <div class="fgrid">
       <div class="fg ffull"><label class="fl">Gelir Adı</label><input class="fi" id="sg-ad" placeholder="Örn: Kira Geliri, Abonelik..."></div>
-      <div class="fg"><label class="fl">Tutar (₺)</label><input class="fi" type="number" id="sg-tu" placeholder="0"></div>
+      <div class="fg ffull"><label class="fl">Açıklama</label><input class="fi" id="sg-ac" placeholder="Gelir açıklaması (isteğe bağlı)"></div>
+      <div class="fg"><label class="fl">Miktar (₺)</label><input class="fi" type="number" id="sg-tu" placeholder="0"></div>
+      <div class="fg"><label class="fl">KDV %</label>
+        <select class="fs" id="sg-kdv">
+          <option value="20">%20</option>
+          <option value="10">%10</option>
+          <option value="1">%1</option>
+          <option value="0">%0 (KDV'siz)</option>
+        </select>
+      </div>
       <div class="fg"><label class="fl">Sıklık</label>
         <select class="fs" id="sg-siklik">
           <option value="aylik">Aylık</option>
@@ -1007,6 +1022,7 @@ function renderOzet() {
   const onT   = S.teklifler.filter(t=>t.status==='onaylandi'&&new Date(t.tarih).getMonth()===cm&&new Date(t.tarih).getFullYear()===cy);
   const teklifCiro  = onT.reduce((a,t)=>a+(t.satisKDVsiz||0),0);
   const sabitCiro = (S.sabitgelirler||[]).reduce((a,sg)=>a+(sg.siklik==='aylik'?sg.tutar:(sg.tutar/12)),0);
+  const sabitKdv = (S.sabitgelirler||[]).reduce((a,sg)=>{ const net=sg.siklik==='aylik'?sg.tutar:(sg.tutar/12); return a+net*((sg.kdv||0)/100); },0);
   const ciro = teklifCiro + sabitCiro;
   const alisM = onT.reduce((a,t)=>a+(t.alisKDVsiz||0),0);
   const kdvF  = onT.reduce((a,t)=>a+(t.kdvFark||0),0);
@@ -1623,7 +1639,13 @@ function renderVergiler() {
   else if(S.vergiPer==='6ay'){const s=new Date();s.setMonth(s.getMonth()-6);list=S.teklifler.filter(t=>t.status==='onaylandi'&&new Date(t.tarih)>=s);}
   else list=S.teklifler.filter(t=>t.status==='onaylandi'&&new Date(t.tarih).getFullYear()===now.getFullYear());
 
-  const tahsil=list.reduce((a,t)=>a+(t.satisKDV||0),0);
+  const tahsilTeklif=list.reduce((a,t)=>a+(t.satisKDV||0),0);
+  const sabitKDV = S.vergiPer==='ay'
+    ? (S.sabitgelirler||[]).reduce((a,sg)=>{ const net=sg.siklik==='aylik'?sg.tutar:(sg.tutar/12); return a+net*((sg.kdv||0)/100); },0)
+    : S.vergiPer==='6ay'
+    ? (S.sabitgelirler||[]).reduce((a,sg)=>{ const net=sg.siklik==='aylik'?sg.tutar*6:(sg.tutar/2); return a+net*((sg.kdv||0)/100); },0)
+    : (S.sabitgelirler||[]).reduce((a,sg)=>{ const net=sg.siklik==='aylik'?sg.tutar*12:sg.tutar; return a+net*((sg.kdv||0)/100); },0);
+  const tahsil = tahsilTeklif + sabitKDV;
   const odenen=list.reduce((a,t)=>a+(t.alisKDV||0),0);
   const netKDV=tahsil-odenen;
 
@@ -1914,37 +1936,41 @@ function kismiKaydet(id) {
 // Global erişim — mobil onclick için zorunlu
 window.delTeklif  = delTeklif;
 function renderSabitGelir() {
-  const buAy = new Date();
-  const buAyStr = buAy.toISOString().slice(0,7);
-  let toplam = 0;
+  let toplam = 0, toplamKdv = 0;
 
   const rows = S.sabitgelirler.map(sg => {
-    const buAyGelir = sg.siklik === 'aylik' ? sg.tutar : (sg.tutar / 12);
-    toplam += buAyGelir;
+    const aylikNet = sg.siklik === 'aylik' ? sg.tutar : (sg.tutar / 12);
+    const aylikKdv = aylikNet * ((sg.kdv||0) / 100);
+    toplam += aylikNet;
+    toplamKdv += aylikKdv;
     const siklikLabel = sg.siklik === 'aylik' ? 'Aylık' : 'Yıllık';
     return `<tr>
       <td>${sg.ad}</td>
+      <td style="color:var(--muted);font-size:.85rem;">${sg.aciklama||'-'}</td>
       <td>${fmt(sg.tutar)}</td>
+      <td>${sg.kdv||0}%</td>
       <td>${siklikLabel}</td>
-      <td>${sg.baslangic||'-'}</td>
-      <td style="color:var(--green);font-weight:600;">${fmt(buAyGelir)}</td>
+      <td style="color:var(--green);font-weight:600;">${fmt(aylikNet)}</td>
+      <td style="color:var(--amber);font-weight:600;">${fmt(aylikKdv)}</td>
       <td><button class="btn btn-danger btn-sm" onclick="delSabitGelir('${sg.id}')">Sil</button></td>
     </tr>`;
   }).join('');
 
   const tbody = document.getElementById('sabitGelirBody');
-  if(tbody) tbody.innerHTML = rows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;">Henüz sabit gelir eklenmedi</td></tr>';
+  if(tbody) tbody.innerHTML = rows || '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;">Henüz sabit gelir eklenmedi</td></tr>';
 
   const mobList = document.getElementById('sabitGelirMobList');
   if(mobList) mobList.innerHTML = S.sabitgelirler.map(sg => {
-    const buAyGelir = sg.siklik === 'aylik' ? sg.tutar : (sg.tutar / 12);
+    const aylikNet = sg.siklik === 'aylik' ? sg.tutar : (sg.tutar / 12);
+    const aylikKdv = aylikNet * ((sg.kdv||0) / 100);
     return `<div class="gider-mob-item">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div style="font-weight:600;">${sg.ad}</div>
-        <div style="color:var(--green);font-weight:700;">${fmt(buAyGelir)}/ay</div>
+        <div style="color:var(--green);font-weight:700;">${fmt(aylikNet)}/ay</div>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-top:.4rem;">
-        <div style="color:var(--muted);font-size:.8rem;">${sg.siklik==='aylik'?'Aylık':'Yıllık'} · ${sg.baslangic||'-'}</div>
+      ${sg.aciklama ? `<div style="color:var(--muted);font-size:.8rem;margin-top:.2rem;">${sg.aciklama}</div>` : ''}
+      <div style="display:flex;justify-content:space-between;margin-top:.4rem;align-items:center;">
+        <div style="color:var(--muted);font-size:.8rem;">KDV: <span style="color:var(--amber);">${fmt(aylikKdv)}</span> · ${sg.siklik==='aylik'?'Aylık':'Yıllık'}</div>
         <button class="btn btn-danger btn-sm" onclick="delSabitGelir('${sg.id}')">Sil</button>
       </div>
     </div>`;
@@ -1952,23 +1978,30 @@ function renderSabitGelir() {
 
   const toplamEl = document.getElementById('sabitGelirToplam');
   if(toplamEl) toplamEl.textContent = fmt(toplam);
+  const kdvEl = document.getElementById('sabitGelirKdvToplam');
+  if(kdvEl) kdvEl.textContent = fmt(toplamKdv);
 }
 
 function openSabitGelirModal() {
   document.getElementById('sg-ad').value = '';
+  document.getElementById('sg-ac').value = '';
   document.getElementById('sg-tu').value = '';
   document.getElementById('sg-ta').value = today();
   document.getElementById('sg-siklik').value = 'aylik';
+  document.getElementById('sg-kdv').value = '20';
   document.getElementById('sabitGelirModal').classList.add('open');
 }
 
 function saveSabitGelir() {
   const ad = document.getElementById('sg-ad').value.trim();
   const tu = parseFloat(document.getElementById('sg-tu').value);
-  if(!ad || !tu) { toast('Gelir adı ve tutar zorunlu','err'); return; }
+  if(!ad || !tu) { toast('Gelir adı ve miktar zorunlu','err'); return; }
   S.sabitgelirler.push({
     id: 'SG-' + Date.now().toString(36).toUpperCase().slice(-5),
-    ad, tutar: tu,
+    ad,
+    aciklama: document.getElementById('sg-ac').value.trim(),
+    tutar: tu,
+    kdv: parseInt(document.getElementById('sg-kdv').value),
     siklik: document.getElementById('sg-siklik').value,
     baslangic: document.getElementById('sg-ta').value
   });
