@@ -443,6 +443,7 @@
     <div class="sb-item" onclick="goPage('teklifler')"><span class="si">📄</span> Teklifler</div>
     <div class="sb-item" onclick="goPage('musteriler')"><span class="si">👥</span> Müşteriler</div>
     <div class="sb-item" onclick="goPage('giderler')"><span class="si">💸</span> Giderler</div>
+    <div class="sb-item" onclick="goPage('sabitgelir')"><span class="si">💰</span> Sabit Gelirler</div>
     <div class="sb-item" onclick="goPage('vergiler')"><span class="si">🧾</span> Vergiler</div>
     <div class="sb-item" onclick="goPage('raporlar')"><span class="si">📈</span> Raporlar</div>
   </nav>
@@ -471,6 +472,7 @@
   <div class="mob-nav-item" onclick="goPage('teklifler')" id="mn-teklifler"><span class="mni">📄</span>Teklifler</div>
   <div class="mob-nav-item" onclick="goPage('musteriler')" id="mn-musteriler"><span class="mni">👥</span>Müşteriler</div>
   <div class="mob-nav-item" onclick="goPage('giderler')" id="mn-giderler"><span class="mni">💸</span>Giderler</div>
+  <div class="mob-nav-item" onclick="goPage('sabitgelir')" id="mn-sabitgelir"><span class="mni">💰</span>Sabit</div>
   <div class="mob-nav-item" onclick="goPage('vergiler')" id="mn-vergiler"><span class="mni">🧾</span>Vergiler</div>
   <div class="mob-nav-item" onclick="goPage('raporlar')" id="mn-raporlar"><span class="mni">📈</span>Raporlar</div>
 </nav>
@@ -565,6 +567,25 @@
       </table>
     </div>
     <div class="mob-gider-list" id="giderMobList"></div>
+  </div>
+
+  <!-- SABİT GELİRLER -->
+  <div class="page" id="page-sabitgelir">
+    <div class="sh">
+      <div><div class="st">Sabit Gelirler</div><div class="ss">Düzenli aylık gelirler</div></div>
+      <button class="btn btn-primary" onclick="openSabitGelirModal()">+ Gelir Ekle</button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Gelir Adı</th><th>Tutar</th><th>Sıklık</th><th>Başlangıç</th><th>Bu Ay</th><th>İşlem</th></tr></thead>
+        <tbody id="sabitGelirBody"></tbody>
+      </table>
+    </div>
+    <div class="mob-gider-list" id="sabitGelirMobList"></div>
+    <div style="margin-top:1.5rem;padding:1rem;background:var(--surface);border-radius:12px;border:1px solid var(--border);">
+      <div style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem;">Bu Ay Toplam Sabit Gelir</div>
+      <div id="sabitGelirToplam" style="font-size:1.8rem;font-weight:700;color:var(--green);">₺0,00</div>
+    </div>
   </div>
 
   <!-- VERGİLER -->
@@ -745,6 +766,28 @@
   </div>
 </div>
 
+<!-- SABİT GELİR MODAL -->
+<div class="mo" id="sabitGelirModal">
+  <div class="md" style="max-width:440px;">
+    <div class="mh"><div class="mt-modal">Sabit Gelir Ekle</div><button class="mc" onclick="closeMo('sabitGelirModal')">✕</button></div>
+    <div class="fgrid">
+      <div class="fg ffull"><label class="fl">Gelir Adı</label><input class="fi" id="sg-ad" placeholder="Örn: Kira Geliri, Abonelik..."></div>
+      <div class="fg"><label class="fl">Tutar (₺)</label><input class="fi" type="number" id="sg-tu" placeholder="0"></div>
+      <div class="fg"><label class="fl">Sıklık</label>
+        <select class="fs" id="sg-siklik">
+          <option value="aylik">Aylık</option>
+          <option value="yillik">Yıllık</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Başlangıç Tarihi</label><input class="fi" type="date" id="sg-ta"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost" onclick="closeMo('sabitGelirModal')">İptal</button>
+      <button class="btn btn-primary" onclick="saveSabitGelir()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
 <!-- PDF MODAL -->
 <div class="mo" id="pdfModal">
   <div class="md" style="max-width:720px;">
@@ -843,6 +886,7 @@ const S = {
   teklifler:  [],
   giderler:   [],
   musteriler: [],
+  sabitgelirler: [],
   logo:       localStorage.getItem('rm_logo') || '',
   kalemler:  [],
   editId:    null,
@@ -870,15 +914,17 @@ const save = () => {
     await sbSet('teklifler', S.teklifler);
     await sbSet('giderler', S.giderler);
     await sbSet('musteriler', S.musteriler);
+    await sbSet('sabitgelirler', S.sabitgelirler);
     if(S.logo) localStorage.setItem('rm_logo', S.logo);
   }, 500);
 };
 
 async function loadFromSupabase() {
-  const [t, g, m] = await Promise.all([sbGet('teklifler'), sbGet('giderler'), sbGet('musteriler')]);
+  const [t, g, m, sg] = await Promise.all([sbGet('teklifler'), sbGet('giderler'), sbGet('musteriler'), sbGet('sabitgelirler')]);
   S.teklifler  = t || [];
   S.giderler   = g || [];
   S.musteriler = m || [];
+  S.sabitgelirler = sg || [];
 }
 
 const set  = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
@@ -893,7 +939,7 @@ function toast(msg, type='ok') {
 /* ═══════════════════════════════════
    NAV
 ═══════════════════════════════════ */
-const TITLES={ozet:'Özet',teklifler:'Teklifler',musteriler:'Müşteri Rehberi',giderler:'Giderler',vergiler:'Vergiler',raporlar:'Raporlar'};
+const TITLES={ozet:'Özet',teklifler:'Teklifler',musteriler:'Müşteri Rehberi',giderler:'Giderler',sabitgelir:'Sabit Gelirler',vergiler:'Vergiler',raporlar:'Raporlar'};
 function goPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
@@ -905,7 +951,7 @@ function goPage(id) {
   if(mnEl) mnEl.classList.add('active');
   document.getElementById('pageTitle').textContent = TITLES[id];
   document.querySelector('.main').scrollTo(0,0);
-  ({ozet:renderOzet,teklifler:renderTeklifler,musteriler:renderMusteriler,giderler:renderGiderler,vergiler:renderVergiler,raporlar:renderRaporlar})[id]?.();
+  ({ozet:renderOzet,teklifler:renderTeklifler,musteriler:renderMusteriler,giderler:renderGiderler,sabitgelir:renderSabitGelir,vergiler:renderVergiler,raporlar:renderRaporlar})[id]?.();
 }
 document.getElementById('topDate').textContent = new Date().toLocaleDateString('tr-TR',{day:'numeric',month:'long',year:'numeric'});
 
@@ -959,7 +1005,9 @@ function renderChart(id, months) {
 function renderOzet() {
   const now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
   const onT   = S.teklifler.filter(t=>t.status==='onaylandi'&&new Date(t.tarih).getMonth()===cm&&new Date(t.tarih).getFullYear()===cy);
-  const ciro  = onT.reduce((a,t)=>a+(t.satisKDVsiz||0),0);
+  const teklifCiro  = onT.reduce((a,t)=>a+(t.satisKDVsiz||0),0);
+  const sabitCiro = (S.sabitgelirler||[]).reduce((a,sg)=>a+(sg.siklik==='aylik'?sg.tutar:(sg.tutar/12)),0);
+  const ciro = teklifCiro + sabitCiro;
   const alisM = onT.reduce((a,t)=>a+(t.alisKDVsiz||0),0);
   const kdvF  = onT.reduce((a,t)=>a+(t.kdvFark||0),0);
   const manuelG = S.giderler.filter(g=>new Date(g.tarih).getMonth()===cm&&new Date(g.tarih).getFullYear()===cy).reduce((a,g)=>a+(g.tutar||0),0);
@@ -971,7 +1019,7 @@ function renderOzet() {
   const bek   = S.teklifler.filter(t=>t.status==='beklemede').length;
 
   set('o-ciro',   fmt(ciro));
-  set('o-ciro-sub', onT.length+' onaylı teklif');
+  set('o-ciro-sub', onT.length+' onaylı teklif' + (sabitCiro>0?' + sabit gelir':''));
   set('o-gider',  fmt(gider));
   set('o-gider-sub', manuelSayi+' manuel + alış maliyeti');
   set('o-kar',    fmt(kar));
@@ -1865,7 +1913,79 @@ function kismiKaydet(id) {
 
 // Global erişim — mobil onclick için zorunlu
 window.delTeklif  = delTeklif;
-window.delGider   = delGider;
+function renderSabitGelir() {
+  const buAy = new Date();
+  const buAyStr = buAy.toISOString().slice(0,7);
+  let toplam = 0;
+
+  const rows = S.sabitgelirler.map(sg => {
+    const buAyGelir = sg.siklik === 'aylik' ? sg.tutar : (sg.tutar / 12);
+    toplam += buAyGelir;
+    const siklikLabel = sg.siklik === 'aylik' ? 'Aylık' : 'Yıllık';
+    return `<tr>
+      <td>${sg.ad}</td>
+      <td>${fmt(sg.tutar)}</td>
+      <td>${siklikLabel}</td>
+      <td>${sg.baslangic||'-'}</td>
+      <td style="color:var(--green);font-weight:600;">${fmt(buAyGelir)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="delSabitGelir('${sg.id}')">Sil</button></td>
+    </tr>`;
+  }).join('');
+
+  const tbody = document.getElementById('sabitGelirBody');
+  if(tbody) tbody.innerHTML = rows || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;">Henüz sabit gelir eklenmedi</td></tr>';
+
+  const mobList = document.getElementById('sabitGelirMobList');
+  if(mobList) mobList.innerHTML = S.sabitgelirler.map(sg => {
+    const buAyGelir = sg.siklik === 'aylik' ? sg.tutar : (sg.tutar / 12);
+    return `<div class="gider-mob-item">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:600;">${sg.ad}</div>
+        <div style="color:var(--green);font-weight:700;">${fmt(buAyGelir)}/ay</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:.4rem;">
+        <div style="color:var(--muted);font-size:.8rem;">${sg.siklik==='aylik'?'Aylık':'Yıllık'} · ${sg.baslangic||'-'}</div>
+        <button class="btn btn-danger btn-sm" onclick="delSabitGelir('${sg.id}')">Sil</button>
+      </div>
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--muted);padding:2rem;">Henüz sabit gelir eklenmedi</div>';
+
+  const toplamEl = document.getElementById('sabitGelirToplam');
+  if(toplamEl) toplamEl.textContent = fmt(toplam);
+}
+
+function openSabitGelirModal() {
+  document.getElementById('sg-ad').value = '';
+  document.getElementById('sg-tu').value = '';
+  document.getElementById('sg-ta').value = today();
+  document.getElementById('sg-siklik').value = 'aylik';
+  document.getElementById('sabitGelirModal').classList.add('open');
+}
+
+function saveSabitGelir() {
+  const ad = document.getElementById('sg-ad').value.trim();
+  const tu = parseFloat(document.getElementById('sg-tu').value);
+  if(!ad || !tu) { toast('Gelir adı ve tutar zorunlu','err'); return; }
+  S.sabitgelirler.push({
+    id: 'SG-' + Date.now().toString(36).toUpperCase().slice(-5),
+    ad, tutar: tu,
+    siklik: document.getElementById('sg-siklik').value,
+    baslangic: document.getElementById('sg-ta').value
+  });
+  save(); closeMo('sabitGelirModal'); renderSabitGelir(); toast('Sabit gelir eklendi ✓');
+}
+
+function delSabitGelir(id) {
+  onay('Bu sabit geliri silmek istiyor musunuz?', () => {
+    S.sabitgelirler = S.sabitgelirler.filter(sg => sg.id !== id);
+    save(); renderSabitGelir(); toast('Silindi','err');
+  });
+}
+
+window.renderSabitGelir = renderSabitGelir;
+window.openSabitGelirModal = openSabitGelirModal;
+window.saveSabitGelir = saveSabitGelir;
+window.delSabitGelir = delSabitGelir;
 window.delKalem   = delKalem;
 window.chStatus   = chStatus;
 window.openTeklifModal = openTeklifModal;
