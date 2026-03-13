@@ -815,10 +815,34 @@
 /* ═══════════════════════════════════
    STATE
 ═══════════════════════════════════ */
+// SUPABASE BAĞLANTISI
+const SB_URL = 'https://fxycjhzseywphohsrnvy.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4eWNqaHpzZXl3cGhvaHNybnZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MzAzNzAsImV4cCI6MjA4ODIwNjM3MH0.JpXxfVra83mbfVXpWZDuBQmJxHxtZ25IF9z6fFE5xsI';
+
+async function sbGet(id) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/hesap_data?id=eq.${id}&select=data`, {
+      headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY}
+    });
+    const d = await r.json();
+    return d && d[0] ? d[0].data : null;
+  } catch(e) { return null; }
+}
+
+async function sbSet(id, data) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/hesap_data`, {
+      method: 'POST',
+      headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'},
+      body: JSON.stringify({id, data, updated_at: new Date().toISOString()})
+    });
+  } catch(e) {}
+}
+
 const S = {
-  teklifler:  JSON.parse(localStorage.getItem('rm_t') || '[]'),
-  giderler:   JSON.parse(localStorage.getItem('rm_g') || '[]'),
-  musteriler: JSON.parse(localStorage.getItem('rm_m') || '[]'),
+  teklifler:  [],
+  giderler:   [],
+  musteriler: [],
   logo:       localStorage.getItem('rm_logo') || '',
   kalemler:  [],
   editId:    null,
@@ -828,9 +852,6 @@ const S = {
   pdfData:   null,
 };
 
-/* ═══════════════════════════════════
-   UTILS
-═══════════════════════════════════ */
 const fmt  = n => '₺' + Number(n||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtK = n => Number(n||0)>=1000 ? '₺'+(Number(n)/1000).toFixed(1)+'B' : fmt(n);
 const uid  = () => {
@@ -841,13 +862,27 @@ const uid  = () => {
 };
 const gid  = () => 'G-'   + Date.now().toString(36).toUpperCase().slice(-5);
 const today= () => new Date().toISOString().split('T')[0];
+
+let saveTimeout = null;
 const save = () => {
-  localStorage.setItem('rm_t', JSON.stringify(S.teklifler));
-  localStorage.setItem('rm_g', JSON.stringify(S.giderler));
-  localStorage.setItem('rm_m', JSON.stringify(S.musteriler));
-  if(S.logo) localStorage.setItem('rm_logo', S.logo);
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async () => {
+    await sbSet('teklifler', S.teklifler);
+    await sbSet('giderler', S.giderler);
+    await sbSet('musteriler', S.musteriler);
+    if(S.logo) localStorage.setItem('rm_logo', S.logo);
+  }, 500);
 };
+
+async function loadFromSupabase() {
+  const [t, g, m] = await Promise.all([sbGet('teklifler'), sbGet('giderler'), sbGet('musteriler')]);
+  S.teklifler  = t || [];
+  S.giderler   = g || [];
+  S.musteriler = m || [];
+}
+
 const set  = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+
 
 function toast(msg, type='ok') {
   const el = document.getElementById('toast');
@@ -1868,6 +1903,7 @@ function doLogin() {
   if(u === '1mehmetpamuk' && p === '141551026Mp.') {
     sessionStorage.setItem('rm-auth','1');
     document.getElementById('login-screen').classList.add('hidden');
+    initApp();
   } else {
     document.getElementById('login-err').style.display = 'block';
   }
@@ -1875,14 +1911,17 @@ function doLogin() {
 document.addEventListener('keydown', e => {
   if(e.key === 'Enter' && !document.getElementById('login-screen').classList.contains('hidden')) doLogin();
 });
-if(sessionStorage.getItem('rm-auth') === '1') {
-  document.getElementById('login-screen').classList.add('hidden');
+
+async function initApp() {
+  await loadFromSupabase();
+  logoGoster();
+  renderOzet();
 }
 
-save();
-
-logoGoster();
-renderOzet();
+if(sessionStorage.getItem('rm-auth') === '1') {
+  document.getElementById('login-screen').classList.add('hidden');
+  initApp();
+}
 </script>
 </body>
 </html>
