@@ -16,6 +16,18 @@
     }
     html,body{height:100%;overflow:hidden}
     body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;-webkit-font-smoothing:antialiased;}
+    #login-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+    #login-screen.hidden{display:none;}
+    .login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:2.5rem 2rem;width:100%;max-width:380px;display:flex;flex-direction:column;gap:1.2rem;}
+    .login-logo{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:.1em;background:linear-gradient(135deg,var(--silver),var(--silver2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:center;}
+    .login-sub{text-align:center;font-size:.8rem;color:var(--muted);margin-top:-.6rem;}
+    .login-field{display:flex;flex-direction:column;gap:.4rem;}
+    .login-field label{font-size:.72rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;}
+    .login-field input{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:.75rem 1rem;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;outline:none;transition:border .2s;}
+    .login-field input:focus{border-color:var(--silver);}
+    .login-btn{background:linear-gradient(135deg,var(--silver),var(--silver2));color:#07080a;border:none;border-radius:8px;padding:.8rem;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:opacity .2s;}
+    .login-btn:hover{opacity:.85;}
+    .login-err{color:var(--red);font-size:.8rem;text-align:center;display:none;}
 
     .sidebar{width:210px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;}
     .sb-brand{padding:1.5rem 1.3rem 1.1rem;border-bottom:1px solid var(--border);}
@@ -401,6 +413,23 @@
   </style>
 </head>
 <body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">RU MEDYA</div>
+    <div class="login-sub">Yönetim Paneli</div>
+    <div class="login-field">
+      <label>Kullanıcı Adı</label>
+      <input id="login-user" type="text" placeholder="Kullanıcı adı" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label>Şifre</label>
+      <input id="login-pass" type="password" placeholder="Şifre" autocomplete="current-password">
+    </div>
+    <div class="login-err" id="login-err">Kullanıcı adı veya şifre hatalı.</div>
+    <button class="login-btn" onclick="doLogin()">Giriş Yap</button>
+  </div>
+</div>
 
 <aside class="sidebar">
   <div class="sb-brand">
@@ -1832,6 +1861,24 @@ window.kismiKaydet = kismiKaydet;
 
 // Eski sürümden kalan otomatik giderleri temizle
 S.giderler = S.giderler.filter(g => !g.otomatik && !g.teklifId);
+// GİRİŞ KONTROLÜ
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  if(u === '1mehmetpamuk' && p === '141551026Mp.') {
+    sessionStorage.setItem('rm-auth','1');
+    document.getElementById('login-screen').classList.add('hidden');
+  } else {
+    document.getElementById('login-err').style.display = 'block';
+  }
+}
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !document.getElementById('login-screen').classList.contains('hidden')) doLogin();
+});
+if(sessionStorage.getItem('rm-auth') === '1') {
+  document.getElementById('login-screen').classList.add('hidden');
+}
+
 save();
 
 logoGoster();
